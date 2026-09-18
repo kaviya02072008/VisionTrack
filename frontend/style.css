@@ -1,0 +1,280 @@
+/* ═════════════════════════════════════════════════════════════════════════
+   VisionTrack — Dashboard Styles
+   ═════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+body {
+    background: radial-gradient(ellipse at top right, #1e1b4b 0%, #0f172a 60%);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+}
+
+/* ─── Glass effects ─────────────────────────────────────────────────────── */
+.glassmorphism {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.glass-card {
+    background: rgba(30, 41, 59, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Section title ─────────────────────────────────────────────────────── */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+/* ─── KPI cards ─────────────────────────────────────────────────────────── */
+.kpi-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.kpi-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ─── Mode badges ───────────────────────────────────────────────────────── */
+.mode-badge-demo {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.mode-badge-real {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-demo {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* ─── Traffic level badges ─────────────────────────────────────────────── */
+.badge-high {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.badge-medium {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.badge-low {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.4);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+.btn-primary {
+    background: #3b82f6;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-primary:hover { background: #2563eb; }
+
+.btn-success {
+    background: #10b981;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-success:hover { background: #059669; }
+
+.btn-demo {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-demo:hover { background: rgba(245, 158, 11, 0.3); }
+
+.btn-start {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-start:hover { background: rgba(16, 185, 129, 0.35); }
+
+.btn-stop {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-stop:hover { background: rgba(239, 68, 68, 0.3); }
+
+.btn-secondary {
+    background: rgba(71, 85, 105, 0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(71, 85, 105, 0.4);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-secondary:hover { background: rgba(71, 85, 105, 0.4); }
+
+.btn-sm-blue {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-sm-blue:hover { background: rgba(59, 130, 246, 0.3); }
+
+.btn-sm-red {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-sm-red:hover { background: rgba(239, 68, 68, 0.25); }
+
+.btn-export {
+    background: rgba(52, 211, 153, 0.1);
+    color: #6ee7b7;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+}
+.btn-export:hover { background: rgba(52, 211, 153, 0.25); }
+
+/* ─── Feed error state ──────────────────────────────────────────────────── */
+.feed-error {
+    position: relative;
+    min-height: 200px;
+}
+.feed-error::after {
+    content: "⚠ Video stream unavailable. Ensure the backend is running.";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: rgba(0,0,0,0.6);
+    text-align: center;
+    padding: 1rem;
+}
+
+/* ─── Custom scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.7); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
+
+/* ─── Table row hover ───────────────────────────────────────────────────── */
+#dwell-body tr:hover td,
+#traffic-body tr:hover td {
+    background: rgba(255,255,255,0.02);
+}

@@ -1,0 +1,17 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+.env
+*.log
+
+dataset/uploads/
+*.mp4
+*.avi
+*.mov
+
+runs/
+*.pt
+
+.vscode/

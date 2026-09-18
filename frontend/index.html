@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionTrack — Intelligent Occupancy Pattern Analysis</title>
+    <meta name="description" content="VisionTrack: Real-time indoor surveillance analytics with YOLOv8 person detection, ByteTrack tracking, occupancy heatmap, dwell time and traffic pattern analysis.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white font-['Inter'] min-h-screen flex flex-col">
+
+    <!-- ═══ HEADER ══════════════════════════════════════════════════════════ -->
+    <header class="glassmorphism px-6 py-3 border-b border-slate-700/50 flex justify-between items-center z-20 sticky top-0">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400 leading-tight">VisionTrack</h1>
+                <p class="text-xs text-slate-400 leading-tight">Intelligent Occupancy Pattern Analysis</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- Mode badge -->
+            <div id="mode-badge" class="mode-badge-demo px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">DEMO MODE</div>
+            <!-- Live indicator -->
+            <div class="flex items-center gap-2">
+                <span id="live-dot" class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+                <span id="system-status" class="text-sm text-slate-300 font-medium">Demo Mode Active</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══ ERROR BANNER ════════════════════════════════════════════════════ -->
+    <div id="error-banner" class="hidden bg-red-900/60 border-b border-red-700/50 px-6 py-2 text-sm text-red-300 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span id="error-text"></span>
+        <button onclick="document.getElementById('error-banner').classList.add('hidden')" class="ml-auto text-red-400 hover:text-red-200">✕</button>
+    </div>
+
+    <!-- ═══ MAIN GRID ════════════════════════════════════════════════════════ -->
+    <main class="flex-1 p-5 grid grid-cols-12 gap-5 overflow-y-auto">
+
+        <!-- ══ LEFT COLUMN ══════════════════════════════════════════════════ -->
+        <div class="col-span-12 xl:col-span-8 flex flex-col gap-5">
+
+            <!-- Video Input Controls -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                    </svg>
+                    Video Input
+                </h2>
+
+                <div class="flex flex-wrap gap-4">
+                    <!-- Upload -->
+                    <div class="flex-1 min-w-[240px] bg-slate-800/60 p-4 rounded-xl border border-slate-700/40">
+                        <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Upload Video</h3>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="video-upload-file" accept=".mp4,.avi,.mov"
+                                class="text-sm text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-500/20 file:text-blue-400 hover:file:bg-blue-500/30 cursor-pointer" />
+                            <button id="btn-upload" class="btn-primary shrink-0">Upload</button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Supports .mp4, .avi, .mov</p>
+                    </div>
+                    <!-- Select Dataset -->
+                    <div class="flex-1 min-w-[240px] bg-slate-800/60 p-4 rounded-xl border border-slate-700/40">
+                        <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Select Dataset Video</h3>
+                        <div class="flex items-center gap-2">
+                            <select id="dataset-select" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg text-sm px-3 py-1.5 text-white focus:outline-none focus:border-blue-500">
+                                <option value="">Loading…</option>
+                            </select>
+                            <button id="btn-load" class="btn-success shrink-0">Load</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="mt-4 pt-4 border-t border-slate-700/40 flex flex-wrap items-center gap-2">
+                    <button id="btn-demo" class="btn-demo">DEMO MODE</button>
+                    <button id="btn-start" class="btn-start">▶ Start Analysis</button>
+                    <button id="btn-stop" class="btn-stop">⏸ Stop Analysis</button>
+                    <button id="btn-reset" class="btn-secondary">↺ Reset Analytics</button>
+                    <p id="upload-status" class="text-sm text-slate-400 ml-auto"></p>
+                </div>
+            </div>
+
+            <!-- Live Feed -->
+            <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/40">
+                    <h2 class="section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Live Surveillance Feed
+                    </h2>
+                    <span id="demo-badge" class="hidden badge-demo">DEMO</span>
+                </div>
+                <div class="relative aspect-video bg-black">
+                    <img id="video-feed" src="http://127.0.0.1:8000/video_feed" alt="Video Feed"
+                         class="w-full h-full object-contain"
+                         onerror="this.onerror=null; this.parentElement.classList.add('feed-error');" />
+                </div>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/40">
+                    <h2 class="section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                        </svg>
+                        Occupancy Heatmap
+                    </h2>
+                    <div class="flex gap-2">
+                        <button id="btn-toggle-heatmap" class="btn-sm-blue">Hide Heatmap</button>
+                        <button id="btn-reset-heatmap" class="btn-sm-red">Reset Heatmap</button>
+                    </div>
+                </div>
+                <div id="heatmap-container" class="relative aspect-video bg-black">
+                    <img id="heatmap-feed" src="http://127.0.0.1:8000/heatmap_feed" alt="Occupancy Heatmap"
+                         class="w-full h-full object-contain" />
+                </div>
+            </div>
+
+            <!-- Occupancy Chart -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                    </svg>
+                    Occupancy Over Time
+                </h2>
+                <div class="w-full h-52">
+                    <canvas id="occupancyChart"></canvas>
+                </div>
+            </div>
+
+        </div><!-- /LEFT COLUMN -->
+
+        <!-- ══ RIGHT COLUMN ═════════════════════════════════════════════════ -->
+        <div class="col-span-12 xl:col-span-4 flex flex-col gap-5">
+
+            <!-- Video Info -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Video Information
+                </h2>
+                <div id="video-info-container" class="text-sm text-slate-400">
+                    <p class="text-amber-400 text-xs italic">No video selected — running Demo Mode</p>
+                </div>
+            </div>
+
+            <!-- KPI Cards -->
+            <div>
+                <h2 class="section-title mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Live KPIs
+                </h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="kpi-card">
+                        <p class="kpi-label">Current</p>
+                        <p id="stat-current" class="kpi-value text-white">0</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="kpi-label">Peak</p>
+                        <p id="stat-peak" class="kpi-value text-red-400">0</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="kpi-label">Average</p>
+                        <p id="stat-avg" class="kpi-value text-blue-400">0.0</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="kpi-label">Unique People</p>
+                        <p id="stat-unique" class="kpi-value text-emerald-400">0</p>
+                    </div>
+                    <div class="kpi-card col-span-2">
+                        <p class="kpi-label">Avg Dwell Time</p>
+                        <p id="stat-dwell" class="kpi-value text-amber-400">0.0s</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dwell Time Analysis -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Dwell Time by Zone
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead>
+                            <tr class="text-slate-500 uppercase border-b border-slate-700/50">
+                                <th class="pb-2 pr-2">Zone</th>
+                                <th class="pb-2 pr-2">Visits</th>
+                                <th class="pb-2 pr-2">Avg (s)</th>
+                                <th class="pb-2 pr-2">Min</th>
+                                <th class="pb-2">Max</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dwell-body" class="text-slate-300"></tbody>
+                    </table>
+                </div>
+                <div class="mt-4 h-36">
+                    <canvas id="dwellChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Traffic Analysis -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    Traffic by Zone
+                </h2>
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-xs text-left">
+                        <thead>
+                            <tr class="text-slate-500 uppercase border-b border-slate-700/50">
+                                <th class="pb-2 pr-2">Zone</th>
+                                <th class="pb-2 pr-2">Visits</th>
+                                <th class="pb-2 pr-2">Avg Dwell</th>
+                                <th class="pb-2">Level</th>
+                            </tr>
+                        </thead>
+                        <tbody id="traffic-body" class="text-slate-300"></tbody>
+                    </table>
+                </div>
+                <div id="traffic-highlights" class="space-y-2"></div>
+            </div>
+
+            <!-- Movement Patterns -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Movement Patterns
+                </h2>
+                <p class="text-xs text-slate-500 mb-2 uppercase tracking-wider">Common Path</p>
+                <p id="common-path" class="text-sm text-slate-300 mb-4 italic">Collecting data…</p>
+
+                <p class="text-xs text-slate-500 mb-2 uppercase tracking-wider">Zone Transition Matrix</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs" id="matrix-table">
+                        <tbody id="matrix-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Report Export -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Report Export
+                </h2>
+                <p id="export-notice" class="text-xs text-amber-400 mb-3 hidden">⚠ Exporting DEMO data — marked as simulated.</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-export-tracking" class="btn-export">📋 Tracking CSV</button>
+                    <button id="btn-export-occupancy" class="btn-export">📈 Occupancy CSV</button>
+                    <button id="btn-export-zone" class="btn-export">📍 Zone Analysis CSV</button>
+                    <button id="btn-export-matrix" class="btn-export">🔀 Movement Matrix CSV</button>
+                </div>
+            </div>
+
+        </div><!-- /RIGHT COLUMN -->
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
