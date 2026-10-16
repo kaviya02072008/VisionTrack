@@ -5,6 +5,8 @@ import io
 import os
 import math
 import datetime
+import queue
+from collections import deque
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File
@@ -14,10 +16,16 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 from pydantic import BaseModel
 
-from detector import PersonDetector
-from tracker import PersonTracker
-from analyzer import OccupancyAnalyzer
-from heatmap import HeatmapGenerator
+try:
+    from .detector import PersonDetector
+    from .tracker import PersonTracker
+    from .analyzer import OccupancyAnalyzer
+    from .heatmap import HeatmapGenerator
+except ImportError:
+    from detector import PersonDetector
+    from tracker import PersonTracker
+    from analyzer import OccupancyAnalyzer
+    from heatmap import HeatmapGenerator
 
 app = FastAPI(title="VisionTrack API")
 
@@ -40,6 +48,7 @@ tracking_log = []      # accumulated per-object rows for CSV export
 state_lock = threading.Lock()
 
 # Shared references so control endpoints can call reset on live objects
+_detector_ref = None
 _analyzer_ref = None
 _tracker_ref = None
 _heatmap_ref = None
@@ -106,14 +115,20 @@ def get_demo_frame(frame_count):
 def video_processing_thread():
     global latest_frame, latest_heatmap, latest_stats
     global current_mode, active_video_path
-    global _analyzer_ref, _tracker_ref, _heatmap_ref, tracking_log
+    global _detector_ref, _analyzer_ref, _tracker_ref, _heatmap_ref, tracking_log
 
-    detector = PersonDetector()
+    # Model selection: prefer yolov8s.pt for high accuracy (detecting ~12 people), fallback to yolov8n.pt
+    model_s = os.path.join(BASE_DIR, "..", "yolov8s.pt")
+    model_n = os.path.join(BASE_DIR, "..", "yolov8n.pt")
+    model_file = model_s if os.path.exists(model_s) else model_n
+
+    detector = PersonDetector(model_path=model_file, conf_threshold=0.25, imgsz=960)
     tracker = PersonTracker()
     analyzer = OccupancyAnalyzer()
     heatmap_gen = HeatmapGenerator(640, 480)
 
     with state_lock:
+        _detector_ref = detector
         _analyzer_ref = analyzer
         _tracker_ref = tracker
         _heatmap_ref = heatmap_gen
@@ -122,6 +137,70 @@ def video_processing_thread():
     last_video_path = None
     demo_frame_count = 0
 
+    # Decoupled analysis communication
+    analysis_queue = queue.Queue(maxsize=1)
+    analysis_lock = threading.Lock()
+    worker_tracked_objects = []
+    worker_hm_frame = None
+    worker_stats = {}
+    analysis_worker_stop = threading.Event()
+
+    def analysis_worker_func():
+        nonlocal worker_tracked_objects, worker_hm_frame, worker_stats
+        while not analysis_worker_stop.is_set():
+            try:
+                frame_data = analysis_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            frame_idx, frame_copy, video_fps = frame_data
+            h, w = frame_copy.shape[:2]
+            analyzer.update_frame_info(w, h, video_fps)
+            if heatmap_gen.width != w or heatmap_gen.height != h:
+                heatmap_gen = HeatmapGenerator(w, h)
+                with state_lock:
+                    _heatmap_ref = heatmap_gen
+
+            dets = detector.detect(frame_copy)
+            tracked = tracker.update(dets, frame_copy)
+            stats = analyzer.update(tracked)
+            stats["is_demo"] = False
+            diag = dict(detector.last_diagnostics)
+            diag["total_detections"] = stats.get("total_detections", 0)
+            stats["diagnostics"] = diag
+
+            heatmap_gen.update(tracked)
+            hm_image = heatmap_gen.get_heatmap_image(frame_copy)
+
+            # Log for CSV
+            ts = round(analyzer.frame_count / video_fps, 3)
+            with state_lock:
+                for obj in tracked:
+                    zone = analyzer._detect_zone(obj["center_x"], obj["center_y"])
+                    tracking_log.append({
+                        "frame": analyzer.frame_count,
+                        "timestamp": ts,
+                        "track_id": obj["track_id"],
+                        "center_x": obj["center_x"],
+                        "center_y": obj["center_y"],
+                        "confidence": round(obj.get("confidence", 0.0), 3),
+                        "zone": zone or "",
+                        "source": "real",
+                    })
+                if len(tracking_log) > MAX_TRACKING_LOG:
+                    tracking_log[:] = tracking_log[-MAX_TRACKING_LOG:]
+
+            with analysis_lock:
+                worker_tracked_objects = list(tracked)
+                worker_hm_frame = hm_image
+                worker_stats = dict(stats)
+
+    worker_thread = threading.Thread(target=analysis_worker_func, daemon=True)
+    worker_thread.start()
+
+    fps_history = deque(maxlen=30)
+    last_frame_time = time.perf_counter()
+
     while True:
         with state_lock:
             mode = current_mode
@@ -129,19 +208,31 @@ def video_processing_thread():
             running = is_running
 
         if not running:
-            time.sleep(0.2)
+            time.sleep(0.1)
+            last_frame_time = time.perf_counter()
             continue
 
         # ── Video changed → reset analytics ─────────────────────────────────
         if video_path != last_video_path:
             analyzer.reset()
             tracker.reset()
+            detector.reset_tracker()
+            while not analysis_queue.empty():
+                try:
+                    analysis_queue.get_nowait()
+                except queue.Empty:
+                    break
+            with analysis_lock:
+                worker_tracked_objects.clear()
+                worker_hm_frame = None
+                worker_stats.clear()
             with state_lock:
                 tracking_log.clear()
             if cap:
                 cap.release()
                 cap = None
             last_video_path = video_path
+            last_frame_time = time.perf_counter()
 
         # ── DEMO MODE ────────────────────────────────────────────────────────
         if mode == "DEMO" or not video_path:
@@ -157,6 +248,20 @@ def video_processing_thread():
 
             stats = analyzer.update(tracked_objects)
             stats["is_demo"] = True
+            stats["diagnostics"] = {
+                "detected_count": len(tracked_objects),
+                "tracked_count": len(tracked_objects),
+                "total_detections": stats.get("total_detections", 0),
+                "min_confidence": 1.0,
+                "avg_confidence": 1.0,
+                "max_confidence": 1.0,
+                "inference_ms": 0.0,
+                "inference_fps": 30.0,
+                "playback_fps": 30.0,
+                "target_fps": 30.0,
+                "model_name": "simulated",
+                "inference_imgsz": 640,
+            }
 
             heatmap_gen.update(tracked_objects)
             hm_frame = heatmap_gen.get_heatmap_image(frame)
@@ -184,7 +289,7 @@ def video_processing_thread():
                 latest_heatmap = hm_frame
                 latest_stats = stats
 
-            time.sleep(0.1)
+            time.sleep(1.0 / 30.0)
             continue
 
         # ── REAL MODE ────────────────────────────────────────────────────────
@@ -200,54 +305,64 @@ def video_processing_thread():
                     active_video_path = None
                 cap = None
                 continue
+            last_frame_time = time.perf_counter()
 
+        t_frame_start = time.perf_counter()
         ret, frame = cap.read()
         if not ret:
+            # End of video reached: rewind to start
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            time.sleep(0.03)
+            time.sleep(0.01)
             continue
 
-        h, w = frame.shape[:2]
-        analyzer.update_frame_info(w, h, fps)
-        if heatmap_gen.width != w or heatmap_gen.height != h:
-            heatmap_gen = HeatmapGenerator(w, h)
-            with state_lock:
-                _heatmap_ref = heatmap_gen
+        video_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        frame_interval = 1.0 / video_fps
 
-        # Pipeline: detect → track → analyze → heatmap → draw
-        detections = detector.detect(frame)
-        tracked_objects = tracker.update(detections, frame)
-        stats = analyzer.update(tracked_objects)
-        stats["is_demo"] = False
+        # Submit to analysis worker if queue is empty (non-blocking)
+        if analysis_queue.empty():
+            try:
+                frame_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+                analysis_queue.put_nowait((frame_pos, frame.copy(), video_fps))
+            except queue.Full:
+                pass
 
-        heatmap_gen.update(tracked_objects)
-        hm_frame = heatmap_gen.get_heatmap_image(frame)
-        frame = tracker.draw_tracking(frame, tracked_objects)
+        # Retrieve latest tracking results from worker
+        with analysis_lock:
+            current_tracked = list(worker_tracked_objects)
+            current_hm = worker_hm_frame
+            current_stats = dict(worker_stats)
 
-        # Log for CSV
-        ts = round(analyzer.frame_count / fps, 3)
+        # Draw tracking bounding boxes, IDs, and trails on current playback frame
+        if current_tracked:
+            drawn_frame = tracker.draw_tracking(frame.copy(), current_tracked)
+        else:
+            drawn_frame = frame
+
+        # Calculate actual playback FPS
+        now = time.perf_counter()
+        dt_frame = now - last_frame_time
+        last_frame_time = now
+        if dt_frame > 0:
+            fps_history.append(1.0 / dt_frame)
+        current_playback_fps = round(sum(fps_history) / len(fps_history), 1) if fps_history else round(video_fps, 1)
+
+        if current_stats and "diagnostics" in current_stats:
+            current_stats["diagnostics"]["playback_fps"] = current_playback_fps
+            current_stats["diagnostics"]["target_fps"] = round(video_fps, 1)
+
+        # If heatmap image not yet ready, use current drawn frame
+        if current_hm is None:
+            current_hm = drawn_frame
+
         with state_lock:
-            for obj in tracked_objects:
-                zone = analyzer._detect_zone(obj["center_x"], obj["center_y"])
-                tracking_log.append({
-                    "frame": analyzer.frame_count,
-                    "timestamp": ts,
-                    "track_id": obj["track_id"],
-                    "center_x": obj["center_x"],
-                    "center_y": obj["center_y"],
-                    "confidence": round(obj.get("confidence", 0.0), 3),
-                    "zone": zone or "",
-                    "source": "real",
-                })
-            if len(tracking_log) > MAX_TRACKING_LOG:
-                tracking_log[:] = tracking_log[-MAX_TRACKING_LOG:]
+            latest_frame = drawn_frame
+            latest_heatmap = current_hm
+            latest_stats = current_stats
 
-        with state_lock:
-            latest_frame = frame
-            latest_heatmap = hm_frame
-            latest_stats = stats
-
-        time.sleep(1 / 30.0)
+        # Precision pacing: sleep only the remaining time to achieve exact original video playback speed
+        elapsed = time.perf_counter() - t_frame_start
+        sleep_time = max(0.001, frame_interval - elapsed)
+        time.sleep(sleep_time)
 
 
 # ─── MJPEG stream generator ──────────────────────────────────────────────────
@@ -257,7 +372,16 @@ def frame_generator(feed_type="standard"):
             frame = latest_heatmap if feed_type == "heatmap" else latest_frame
 
         if frame is not None:
-            ret, buffer = cv2.imencode(".jpg", frame)
+            # Scale frame for smooth streaming display if larger than 1024px
+            h, w = frame.shape[:2]
+            max_stream_dim = 1024
+            if max(h, w) > max_stream_dim:
+                stream_scale = max_stream_dim / max(h, w)
+                stream_frame = cv2.resize(frame, (int(w * stream_scale), int(h * stream_scale)))
+            else:
+                stream_frame = frame
+
+            ret, buffer = cv2.imencode(".jpg", stream_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if ret:
                 yield (
                     b"--frame\r\n"
@@ -419,10 +543,26 @@ def get_video_info():
 @app.post("/control/start")
 def control_start():
     """Start analysis. If a real video is selected, switches to REAL mode."""
-    global is_running, current_mode
+    global is_running, current_mode, active_video_path
     with state_lock:
         is_running = True
-        # If a video path is available, force REAL mode
+        # If no active video selected, check if any uploaded or dataset video exists
+        if not active_video_path:
+            if os.path.exists(UPLOADS_DIR):
+                for f in sorted(os.listdir(UPLOADS_DIR)):
+                    if os.path.splitext(f)[1].lower() in ALLOWED_EXTENSIONS:
+                        cand = os.path.join(UPLOADS_DIR, f)
+                        if os.path.isfile(cand):
+                            active_video_path = os.path.normpath(cand)
+                            break
+            if not active_video_path and os.path.exists(DATASET_DIR):
+                for f in sorted(os.listdir(DATASET_DIR)):
+                    if os.path.splitext(f)[1].lower() in ALLOWED_EXTENSIONS:
+                        cand = os.path.join(DATASET_DIR, f)
+                        if os.path.isfile(cand):
+                            active_video_path = os.path.normpath(cand)
+                            break
+
         if active_video_path:
             current_mode = "REAL"
         mode = current_mode
@@ -446,6 +586,8 @@ def control_reset():
         _analyzer_ref.reset()
     if _tracker_ref is not None:
         _tracker_ref.reset()
+    if _detector_ref is not None:
+        _detector_ref.reset_tracker()
     with state_lock:
         tracking_log.clear()
         latest_stats = {}
@@ -597,4 +739,4 @@ else:
     print(f"Warning: frontend not found at {FRONTEND_DIR}")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)

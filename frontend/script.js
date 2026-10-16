@@ -162,6 +162,43 @@ function updateDashboard(data) {
         occupancyChart.update('none');
     }
 
+    // ── Live Diagnostics ───────────────────────────────────────────────────────
+    if (data.diagnostics) {
+        const diag = data.diagnostics;
+        const diagDetected = document.getElementById('diag-detected');
+        const diagConf = document.getElementById('diag-conf');
+        const diagPlayback = document.getElementById('diag-playback');
+        const diagInference = document.getElementById('diag-inference');
+        const diagModel = document.getElementById('diag-model');
+        const diagTotalDets = document.getElementById('diag-total-dets');
+
+        if (diagDetected) {
+            diagDetected.textContent = `${data.current_occupancy ?? diag.detected_count ?? 0} people`;
+        }
+        if (diagConf) {
+            const avgC = diag.avg_confidence != null ? diag.avg_confidence.toFixed(2) : '0.00';
+            const minC = diag.min_confidence != null ? diag.min_confidence.toFixed(2) : '0.00';
+            diagConf.textContent = `${avgC} / ${minC}`;
+        }
+        if (diagPlayback) {
+            const pbFps = diag.playback_fps != null ? diag.playback_fps.toFixed(1) : (diag.target_fps != null ? diag.target_fps.toFixed(1) : '0.0');
+            diagPlayback.textContent = `${pbFps} FPS (Original)`;
+        }
+        if (diagInference) {
+            const infFps = diag.inference_fps != null ? diag.inference_fps.toFixed(1) : '0.0';
+            const infMs = diag.inference_ms != null ? Math.round(diag.inference_ms) : 0;
+            diagInference.textContent = `${infFps} FPS / ${infMs}ms`;
+        }
+        if (diagModel) {
+            const mName = diag.model_name ? diag.model_name.toUpperCase() : 'YOLO';
+            const mImg = diag.inference_imgsz ? `${diag.inference_imgsz}px` : '';
+            diagModel.textContent = `${mName} (${mImg})`;
+        }
+        if (diagTotalDets) {
+            diagTotalDets.textContent = `${data.total_detections ?? diag.total_detections ?? 0} observations`;
+        }
+    }
+
     // ── Dwell table + chart ──────────────────────────────────────────────────
     if (data.dwell_stats) {
         updateDwellTable(data.dwell_stats);
@@ -506,6 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('common-path').classList.add('italic');
                 ['stat-current','stat-peak','stat-avg','stat-unique'].forEach(id => document.getElementById(id).textContent = '0');
                 document.getElementById('stat-dwell').textContent = '0.0s';
+                if (document.getElementById('diag-detected')) document.getElementById('diag-detected').textContent = '0 people';
+                if (document.getElementById('diag-conf')) document.getElementById('diag-conf').textContent = '0.00 / 0.00';
+                if (document.getElementById('diag-total-dets')) document.getElementById('diag-total-dets').textContent = '0 observations';
             }
         } catch (e) {
             setStatus('Cannot reach backend.', 'text-red-400');

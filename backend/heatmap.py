@@ -12,13 +12,13 @@ class HeatmapGenerator:
         self.heatmap_layer = np.zeros((self.height, self.width), dtype=np.float32)
         
     def update(self, tracked_objects):
+        # Adapt hotspot radius proportionally to frame dimensions
+        radius = max(25, int(min(self.width, self.height) * 0.025))
+
         for obj in tracked_objects:
             cx, cy = obj["center_x"], obj["center_y"]
             
             if 0 <= cx < self.width and 0 <= cy < self.height:
-                # Add a circular spot for each person
-                radius = 30
-                
                 # Bounding box for the circle
                 min_y = max(0, cy - radius)
                 max_y = min(self.height, cy + radius + 1)
@@ -46,7 +46,6 @@ class HeatmapGenerator:
             return frame.copy() # No heat yet
             
         # Cap normalization at 80% of max, but ensure at least 10 hits for full red
-        # This prevents the first frame from making one spot entirely red.
         cap = max(10.0, max_val * 0.8)
         
         # Normalize to 0-1 range

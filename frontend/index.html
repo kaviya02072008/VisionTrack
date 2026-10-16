@@ -198,6 +198,42 @@
                 </div>
             </div>
 
+            <!-- Diagnostics & Performance -->
+            <div class="glass-card rounded-2xl p-5">
+                <h2 class="section-title mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Live Diagnostics
+                </h2>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40">
+                        <p class="text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Detected in Frame</p>
+                        <p id="diag-detected" class="text-base font-bold text-white">0 people</p>
+                    </div>
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40">
+                        <p class="text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Confidence (Avg / Min)</p>
+                        <p id="diag-conf" class="text-base font-bold text-cyan-400">0.00 / 0.00</p>
+                    </div>
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40">
+                        <p class="text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Playback Speed</p>
+                        <p id="diag-playback" class="text-base font-bold text-emerald-400">0.0 FPS (Original)</p>
+                    </div>
+                    <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/40">
+                        <p class="text-slate-500 font-semibold uppercase tracking-wider mb-0.5">AI Inference</p>
+                        <p id="diag-inference" class="text-base font-bold text-purple-400">0.0 FPS / 0ms</p>
+                    </div>
+                    <div class="col-span-2 bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/40 flex justify-between items-center">
+                        <span class="text-slate-500">Total Detections (Debug)</span>
+                        <span id="diag-total-dets" class="text-slate-300 font-medium font-mono text-xs">0 observations</span>
+                    </div>
+                    <div class="col-span-2 bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/40 flex justify-between items-center">
+                        <span class="text-slate-500">Active Model</span>
+                        <span id="diag-model" class="text-slate-300 font-medium font-mono text-xs">YOLOv8s (960px)</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Dwell Time Analysis -->
             <div class="glass-card rounded-2xl p-5">
                 <h2 class="section-title mb-4">
